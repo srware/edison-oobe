@@ -17,15 +17,11 @@
             config.maxtime = 10;
             config.errsetup =
                     "<b style='color: red'>Sorry, we encountered an error while upgrading your device.</b> " +
-                    "Please see messsages in the status area above for details. To restore the device to its previous " +
-                    "state, log in via its serial port and run the <code>reboot</code> command." + "<br><br>";
+                    "Please see messsages in the status area above for details. Please restart the device to restore its previous " +
+                    "state." + "<br><br>";
             config.errdisconnect =
-                    "<b style='color: blue'>Sorry, we could not reach your device.</b> Please note that " +
-                    "the upgrade may still have succeeded. To verify, make sure the new device software version is " +
-                    "different from <i>'params_version'</i> (the current version). To determine device software " +
-                    "version, log in via its serial port and run the command <code>configure_edison --version</code>. " +
-                    "If the device software version is same as the one shown above, the upgrade has failed and " +
-                    "you must run the <code>reboot</code> command to restore the device to its previous state." +
+                    "<b style='color: blue'>Sorry, we could not reach your device to verify the upgrade completed " +
+                    "successfully. " +
                     "<br><br>";
             config.configSuccessProgressText = "Device upgrade complete.";
             initFeedbackLib(config);

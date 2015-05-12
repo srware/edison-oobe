@@ -499,6 +499,9 @@ def setNetwork(network_conf, ssid):
         print "Sorry. Could not get an IP address."
     else:
         print "Attempting to enable network access, please check 'wpa_cli status' after a minute to confirm."
+	    network_done = open(STATE_DIR + "/network.done", "w")
+      	network_done.write("Indicates that WiFi has been successfully configured.\n")
+      	network_done.close()
 
 def checkNetwork():
   i = 60
@@ -516,6 +519,7 @@ def checkNetwork():
       break
     if i == 0:
       print "Not connected. Something went wrong."
+      os.remove(STATE_DIR + "/network.done")
       break
     i = i-1
 
@@ -544,7 +548,6 @@ def connectNetwork():
   #print network_conf
   setNetwork(network_conf, ssid)
   checkNetwork()
-  disableOneTimeSetup(True)
 
 def showWiFiIP():
     ipstr = ''
@@ -586,7 +589,7 @@ def getCurrentFirmwareInfo():
     f = open('/etc/version','r')
     ver_str = f.readline()
     f.close()
-    return ("edison-" + ver_str.split('-')[0], ver_str.split('-')[1].splitlines()[0])
+    return (ver_str)
 
 def parseFirmwareInfo(firmwareinfo, build_type):
     fwInfoObj = json.loads(firmwareinfo)
@@ -985,6 +988,23 @@ def getDefaultSSID():
     default_ssid_file.close()
     return curr_ssid.strip()
 
+def checkOneTimeSetup():
+    if not os.path.isfile(STATE_DIR + "/network.done"):
+	enableOneTimeSetup()
+    else:
+        # Check network connection and enable AP mode if WiFi is not connected after 1 minute
+        t = 60
+        while 1:
+            time.sleep(1)
+            address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
+            if not address == "":
+                break
+            if t == 0:
+		os.remove(STATE_DIR + "/network.done")
+                enableOneTimeSetup()
+                break
+            t = t-1
+
 def enableOneTimeSetup(persist):
     subprocess.call("systemctl restart blink-led", shell=True)
 
@@ -1065,6 +1085,7 @@ def main():
     group_non_interactive.add_argument('--latest-version', dest='latestversion', help='Gets the latest firmware version', action='store_true', default=False)
     group_non_interactive.add_argument('--disableOneTimeSetup', dest='disableonetimesetup', help='Disable one-time setup with WiFi access point and enable WiFi client mode \
                                        Append --persist to retain this setting after reboot', action='store_true', default=False)
+        group_non_interactive.add_argument('--checkOneTimeSetup', dest='checkOneTimeSetup', help='Enable one-time setup and WiFi access point if not completed', action='store_true', default=False)
     group_non_interactive.add_argument('--enableOneTimeSetup', dest='enableonetimesetup', help='Enable one-time setup with WiFi access point and disable WiFi client mode. \
                                         Append --persist to retain this setting after reboot', action='store_true', default=False)
     group_non_interactive.add_argument('--toggleOneTimeSetup', dest='toggleonetimesetup', help='Switch between one-time setup with WiFi access point and WiFi client mode, and visa-versa. \
@@ -1104,7 +1125,7 @@ def main():
 
     if args.version:
         try:
-            build_type, version = getCurrentFirmwareInfo()
+            version = getCurrentFirmwareInfo()
             print version
         except Exception as inst:
             print >> sys.stderr, "Could not determine firmware version information. Quitting."
@@ -1188,6 +1209,9 @@ def main():
 
     if args.disableonetimesetup:
         disableOneTimeSetup(args.persist)
+
+    if args.checkOneTimeSetup:
+        checkOneTimeSetup()
 
     if args.toggleonetimesetup:
         toggleOneTimeSetup(args.persist)
