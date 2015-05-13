@@ -187,6 +187,10 @@ label {
     text-align: left;
 }
 
+.infoline_button {
+    text-align: center;
+}
+
 .linkbutton {
     text-align: left;
     color: blue;

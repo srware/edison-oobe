@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enabling Setup</title>
+    <link rel="stylesheet" type="text/css" href="main.css" media="screen"/>
+    <script src="feedbacklib.js"></script>
+    <script type="text/javascript">
+        window.onload = function () {
+            document.cookie = '{}';
+            var config = {};
+            config.host = 'params_hostname'; // uncomment
+            config.ssid = 'params_ssid';
+        }
+    </script>
+    <noscript>
+        Please enable Javascript. It is needed for this page to work correctly. Thank you.
+    </noscript>
+</head>
+<body>
+<h1>Enabling Setup Mode</h1>
+<div class='section'>
+    <div class="content" style="padding: 30px; padding-bottom: 0px">
+        Please wait while we enable setup mode on the device. After around a minute please connect <i>this</i> machine to the 
+        <b>'params_ssid'</b> network and navigate to <a href="http://192.168.42.1">http://192.168.42.1</a>.
+        <br><br>
+    </div>
+</div>
+</body>
+</html>
