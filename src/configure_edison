@@ -499,7 +499,7 @@ def setNetwork(network_conf, ssid):
         print "Sorry. Could not get an IP address."
     else:
         print "Attempting to enable network access, please check 'wpa_cli status' after a minute to confirm."
-	    network_done = open(STATE_DIR + "/network.done", "w")
+	network_done = open(STATE_DIR + "/network.done", "w")
       	network_done.write("Indicates that WiFi has been successfully configured.\n")
       	network_done.close()
 
@@ -990,7 +990,7 @@ def getDefaultSSID():
 
 def checkOneTimeSetup():
     if not os.path.isfile(STATE_DIR + "/network.done"):
-	enableOneTimeSetup()
+	enableOneTimeSetup(False)
     else:
         # Check network connection and enable AP mode if WiFi is not connected after 1 minute
         t = 60
@@ -1001,9 +1001,9 @@ def checkOneTimeSetup():
                 break
             if t == 0:
 		os.remove(STATE_DIR + "/network.done")
-                enableOneTimeSetup()
-                break
-            t = t-1
+                enableOneTimeSetup(False)
+	    else:
+	        t = t-1
 
 def enableOneTimeSetup(persist):
     subprocess.call("systemctl restart blink-led", shell=True)
@@ -1085,7 +1085,7 @@ def main():
     group_non_interactive.add_argument('--latest-version', dest='latestversion', help='Gets the latest firmware version', action='store_true', default=False)
     group_non_interactive.add_argument('--disableOneTimeSetup', dest='disableonetimesetup', help='Disable one-time setup with WiFi access point and enable WiFi client mode \
                                        Append --persist to retain this setting after reboot', action='store_true', default=False)
-        group_non_interactive.add_argument('--checkOneTimeSetup', dest='checkOneTimeSetup', help='Enable one-time setup and WiFi access point if not completed', action='store_true', default=False)
+    group_non_interactive.add_argument('--checkOneTimeSetup', dest='checkOneTimeSetup', help='Enable one-time setup and WiFi access point if not completed', action='store_true', default=False)
     group_non_interactive.add_argument('--enableOneTimeSetup', dest='enableonetimesetup', help='Enable one-time setup with WiFi access point and disable WiFi client mode. \
                                         Append --persist to retain this setting after reboot', action='store_true', default=False)
     group_non_interactive.add_argument('--toggleOneTimeSetup', dest='toggleonetimesetup', help='Switch between one-time setup with WiFi access point and WiFi client mode, and visa-versa. \
