@@ -283,29 +283,6 @@ function submitForm(params, res, req) {
   });
 }
 
-function enableSetup(res) {
-
-  // Do success response.
-  exec ('configure_edison --showNames', function (error, stdout, stderr) {
-    var nameobj = {hostname: "unknown", ssid: "unknown", default_ssid: "unknown"};
-    try {
-      nameobj = JSON.parse(stdout);
-    } catch (ex) {
-      console.log("Could not parse output of configure_edison --showNames (may not be valid JSON)");
-      console.log(ex);
-    }
-
-    var hostname = nameobj.hostname, ssid = nameobj.ssid;
-    var res_str = fs.readFileSync(site + '/exit_enable_setup.html', {encoding: 'utf8'})
-
-    res_str = res_str.replace(/params_hostname/g, hostname + ".local");
-    res_str = res_str.replace(/params_ssid/g, ssid);
-    res.end(res_str);
-
-    runCmd(0, [{cmd: 'configure_edison', args: ['--enableOneTimeSetup']}]);
-  });
-}
-
 function handlePostRequest(req, res) {
   if (urlobj.pathname === '/submitForm') {
     var payload = "";
@@ -360,7 +337,24 @@ function handlePostRequest(req, res) {
       }
     });
   } else if (urlobj.pathname === '/enableSetup') {
-    enableSetup(res);
+    exec ('configure_edison --showNames', function (error, stdout, stderr) {
+        var nameobj = {hostname: "unknown", ssid: "unknown", default_ssid: "unknown"};
+        try {
+            nameobj = JSON.parse(stdout);
+        } catch (ex) {
+            console.log("Could not parse output of configure_edison --showNames (may not be valid JSON)");
+            console.log(ex);
+        }
+
+        var hostname = nameobj.hostname, ssid = nameobj.ssid;
+        var res_str = fs.readFileSync(site + '/exit-enable-setup.html', {encoding: 'utf8'});
+
+        res_str = res_str.replace(/params_hostname/g, hostname + ".local");
+        res_str = res_str.replace(/params_ssid/g, ssid);
+        res.end(res_str);
+
+        runCmd(0, [{cmd: 'configure_edison', args: ['--enableOneTimeSetup']}]);
+    });
   } else {
     pageNotFound(res);
   }
