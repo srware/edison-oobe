@@ -354,7 +354,7 @@ function handlePostRequest(req, res) {
               exitupgradeStr = exitupgradeStr.replace(/params_curr_ssid/g, nameobj.ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_curr_hostname/g, nameobj.hostname + ".local");
               res.end(exitupgradeStr);
-              runCmd(0, [{cmd: 'configure_edison', args: ['--flashFile', files.imagefile[0].path, '--restartWithAP']}]);
+              runCmd(0, [{cmd: 'configure_edison', args: ['--flashFile', files.imagefile[0].path]}]);
             });
           });
       }
