@@ -493,6 +493,7 @@ def setNetwork(network_conf, ssid):
 
         ifarray = subprocess.check_output("wpa_cli ifname", shell=True).split()
         subprocess.call("udhcpc -i " + ifarray[len(ifarray)-1] + " -n &> /dev/null", shell=True)
+	checkNetwork()
     except Exception as e:
         print e
         print "Sorry. Could not get an IP address."
@@ -548,7 +549,6 @@ def connectNetwork():
 
   #print network_conf
   setNetwork(network_conf, ssid)
-  checkNetwork()
 
 def showWiFiIP():
     ipstr = ''
