@@ -14,7 +14,7 @@
             config.ssid = 'params_ssid';
             config.newwifi = 'params_new_wifi';
             initFeedbackLib(config);
-            document.getElementById("errbox").innerHTML += "<br><br>" + getRerunSetupMessage(config.host, config.ssid);
+            document.getElementById("errbox").innerHTML += "<br><br>";
             document.getElementById("errbox").style.display = "inherit";
             queryForCommandOutput();
         }
