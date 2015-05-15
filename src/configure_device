@@ -481,8 +481,7 @@ def setNetwork(network_conf, ssid):
 
     try:
         if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
-          subprocess.call("systemctl stop hostapd &> /dev/null", shell=True)
-          subprocess.call("systemctl start wpa_supplicant &> /dev/null", shell=True)
+          disableSetupMode()
           time.sleep(10)
         else:
           subprocess.call("wpa_cli reconfigure &> /dev/null && sleep 2", shell=True)
@@ -493,15 +492,16 @@ def setNetwork(network_conf, ssid):
 
         ifarray = subprocess.check_output("wpa_cli ifname", shell=True).split()
         subprocess.call("udhcpc -i " + ifarray[len(ifarray)-1] + " -n &> /dev/null", shell=True)
-	checkNetwork()
     except Exception as e:
         print e
         print "Sorry. Could not get an IP address."
+	enableSetupMode()
     else:
-        print "Attempting to enable network access, please check 'wpa_cli status' after a minute to confirm."
+        print "Attempting to enable network access..."
 	network_done = open(STATE_DIR + "/network.done", "w")
       	network_done.write("Indicates that WiFi has been successfully configured.\n")
       	network_done.close()
+	checkNetwork()
 
 def checkNetwork():
   i = 60
@@ -591,46 +591,6 @@ def getCurrentFirmwareInfo():
     ver_str = f.readline()
     f.close()
     return (ver_str)
-
-def parseFirmwareInfo(firmwareinfo, build_type):
-    fwInfoObj = json.loads(firmwareinfo)
-
-    count = 0;
-    # get version number
-    strarray = fwInfoObj["url"].split("/")
-    while (count < len(strarray)):
-        if strarray[count] == build_type:
-            break
-        else:
-            count += 1
-    count += 1
-
-    return (strarray[count], fwInfoObj["hash"], fwInfoObj["url"])
-
-def getLatestFirmwareInfo():
-    build_type = None
-    build_number = None
-
-    try:
-        build_type, build_number = getCurrentFirmwareInfo()
-    except Exception as inst:
-        print >> sys.stderr, "Could not determine firmware version information."
-        raise
-
-    build_url = "http://software.wearables.intel.com/getLatestFirmwareUpdateURL?product=" + build_type
-    request = urllib2.Request(build_url)
-    request.add_header("Accept", "application/json")
-    filehandle = urllib2.urlopen(request)
-    response = filehandle.read()
-    return parseFirmwareInfo(response, build_type)
-
-def getSpecificFirmwareInfo(build_type, build_number):
-    build_url = "http://software.wearables.intel.com/getFirmwareUpdateURL?product=" + build_type + "&version=" + build_number
-    request = urllib2.Request(build_url)
-    request.add_header("Accept", "application/json")
-    filehandle = urllib2.urlopen(request)
-    response = filehandle.read()
-    return parseFirmwareInfo(response, build_type)
 
 def removeFolderContents(folder_path):
     try:
@@ -882,8 +842,8 @@ def checkSetupState():
             if t == 0:
 		os.remove(STATE_DIR + "/network.done")
                 enableSetupMode()
-	    else:
-	        t = t-1
+		break  
+	    t = t-1
 
 def toggleSetupMode():
     if showWiFiMode() == "Master":
