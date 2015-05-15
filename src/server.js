@@ -263,6 +263,7 @@ function submitForm(params, res, req) {
 
     if (params.newwifi) { // WiFi is being configured
       res_str = fs.readFileSync(site + '/exit.html', {encoding: 'utf8'})
+      commands.push({cmd: "configure_device", args: ["--disableSetupMode"]});
     } else {
       res_str = fs.readFileSync(site + '/exiting-without-wifi.html', {encoding: 'utf8'})
     }
@@ -273,8 +274,6 @@ function submitForm(params, res, req) {
     res_str = res_str.replace(/params_curr_ssid/g, nameobj.ssid);
     res_str = res_str.replace(/params_curr_hostname/g, nameobj.hostname + ".local");
     res.end(res_str);
-
-    commands.push({cmd: "configure_device", args: ["--disableSetupMode"]});
 
     // Now execute the commands serially
     runCmd(0, commands);

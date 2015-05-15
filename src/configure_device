@@ -30,7 +30,7 @@ from array import *
 
 WSREGEX = re.compile(r"\s+")
 DESTINATION_PATH = "/tmp/"
-STATE_DIR = '/var/lib/edison_config_tools'
+STATE_DIR = '/var/lib/config_tools'
 CURR_PACKAGE_PATH = ""
 
 class text_colors:
@@ -519,6 +519,7 @@ def checkNetwork():
     if i == 0:
       print "Not connected. Something went wrong."
       os.remove(STATE_DIR + "/network.done")
+      enableSetupMode()
       break
     i = i-1
 
@@ -884,7 +885,7 @@ def checkSetupState():
 	        t = t-1
 
 def toggleSetupMode():
-    if(showWiFiMode() == "Master":
+    if showWiFiMode() == "Master":
 	disableSetupMode()
     else:
 	enableSetupMode()

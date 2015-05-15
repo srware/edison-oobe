@@ -78,44 +78,25 @@ function initFeedbackLib(config) {
   resetProgressBarIncrement();
 
   if (config && config.errdisconnect)
-    DISCONNECT_ERROR_MESSAGE = config.errdisconnect + getRerunSetupMessage(NEW_HOSTNAME, NEW_SSID);
+    DISCONNECT_ERROR_MESSAGE = config.errdisconnect;
   else
     DISCONNECT_ERROR_MESSAGE =
       "<b style='color: red'>Sorry, we were unable to reach your device.</b> Please try again by " +
       "reconnecting this machine to the '" + NEW_WIFI + "' network and clicking " +
-      "<a href='http://" + NEW_HOSTNAME + "'>http://" + NEW_HOSTNAME + "</a>. You can also rerun this setup " +
-      "by following the steps below. " +
-      "If that fails, please connect to the device via its serial port and run <code>configure_device " +
-      "--wifi</code> on the command line. To learn about other configuration options, run <code>configure_device " +
-      "--help</code>." + "<br><br>" + getRerunSetupMessage(NEW_HOSTNAME, NEW_SSID);
+      "<a href='http://" + NEW_HOSTNAME + "'>http://" + NEW_HOSTNAME + "</a>.";
 
   if (config && config.errsetup)
-    CONFIGURE_ERROR_MESSAGE = config.errsetup + getRerunSetupMessage(CURRENT_HOSTNAME, CURRENT_SSID);
+    CONFIGURE_ERROR_MESSAGE = config.errsetup;
   else
     CONFIGURE_ERROR_MESSAGE =
       "<b style='color: red'>Sorry, we encountered an error while configuring your device.</b> " +
-      "Please see messsages in the status area above for details. At this time, we recommend rerunning this setup " +
-      "by following the steps below. If that fails, please connect to the device via its serial port " +
-      "and run <code>configure_device --setup</code> on the command line. " +
-      "To learn about other configuration options, run <code>configure_device --help</code>." + "<br><br>" +
-      getRerunSetupMessage(CURRENT_HOSTNAME, CURRENT_SSID);
+      "Please see messsages in the status area above for details.";
 
   updateProgressText();
 }
 
 function resetProgressBarIncrement() {
   PROGRESS_BAR_INCREMENT = (MAX_PROGRESS_BAR_LEN - PROGRESS_BAR_INITIAL_WIDTH)/(MAX_RETRY_TIME * 60) * REQUEST_INTERVAL;
-}
-
-function getRerunSetupMessage(hostname, ssid) {
-  return "To rerun this setup, do the following: " +
-    "<ol>" +
-    "<li>Press the 'PWR' button for more than 2 seconds (NOTE: Pressing 'PWR' for more than 7 seconds will " +
-    "switch off power to the board)</li> " +
-    "<li>Wait approximately 15 seconds for the device's access point to start</li> " +
-    "<li>Reconnect this machine to the '" + ssid + "' network</li> " +
-    "<li>Visit '<a href='http://" + hostname + "'>http://" + hostname + "</a>' in your browser</li> " +
-    "</ol> ";
 }
 
 function updateProgressBar(allok) {
