@@ -1,7 +1,7 @@
 {
   "name": "oobe",
   "version": "1.2.0",
-  "description": "Web-based administration portal for conifiguring and upgrading the Edison",
+  "description": "Web-based administration portal for configuring and upgrading the device",
   "main": "src/server.js",
   "dependencies": {
     "multiparty": "*",

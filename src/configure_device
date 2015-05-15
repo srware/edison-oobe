@@ -31,7 +31,6 @@ from array import *
 WSREGEX = re.compile(r"\s+")
 DESTINATION_PATH = "/tmp/"
 STATE_DIR = '/var/lib/edison_config_tools'
-HOST_AP_MODE_FILE = "/.start-in-host-ap-mode"
 CURR_PACKAGE_PATH = ""
 
 class text_colors:
@@ -232,15 +231,15 @@ def getNetworkPassword():
 
 def reset(stage):
   subprocess.call("clear", shell=True)
-  print text_colors.CYAN + "\nConfigure Edison: " + stage + "\n" + text_colors.END
+  print text_colors.CYAN + "\nConfigure Device: " + stage + "\n" + text_colors.END
 
 
 # Main Functions
 #######################################
 
-def setEdisonHostname():
+def setDeviceHostname():
   while 1:
-    name = raw_input("Give this Edison a unique name.\nThis will be used for the access point SSID and mDNS address.\nMake it at least five characters long (leave empty to skip): ")
+    name = raw_input("Give this device a unique name.\nThis will be used for the access point SSID and mDNS address.\nMake it at least five characters long (leave empty to skip): ")
     if (WSREGEX.search(name)):
       print ""
       print 'Hostname must not contain whitespaces. Please try again.'
@@ -262,7 +261,7 @@ def setEdisonHostname():
   if len(name) > 0:
       changeName(name)
 
-def setEdisonPassword():
+def setDevicePassword():
    while 1:
      password = getPassword("Enter a new password (leave empty to abort)\nThis will be used to connect to the access point and login to the device.\nPassword: \t")
      if (password == getPassword("Please enter the password again: \t")):
@@ -730,38 +729,7 @@ def downloadPackage(packageUrl, sha1FromServer, packagePath):
 
     return 0
 
-def doOTAFlash(packageUrl, sha1FromServer, packagePath, rebootInApMode):
-    if len(sha1FromServer) != 40:
-        print "Could not establish integrity of latest firmware (bad hash). Unable to proceed."
-        return -1
-
-    try:
-        signal.signal(signal.SIGTERM, signal_term_handler_package_only)
-
-        try:
-            ret_value = downloadPackage(packageUrl, sha1FromServer, packagePath)
-            if ret_value != 0:
-                return -1
-        except Exception as inst:
-            err_downloadPackage()
-            print >> sys.stderr, type(inst)
-            print >> sys.stderr, inst
-            return -1
-
-        flashFile(packagePath, rebootInApMode)
-    except KeyboardInterrupt:
-        print ""
-        print "Interrupted by user. Cleaning up."
-        removePackage()
-        print "Please reboot the device to return to normal."
-    except Exception as inst:
-        print "Exception occurred while upgrading. Cleaning up."
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        removePackage()
-        print "Please reboot the device to return to normal."
-
-def flashFile(packagePath, rebootInApMode):
+def flashFile(packagePath):
     if not os.path.isfile(packagePath):
         print "Error: cannot upgrade. Package file " + packagePath + " does not exist."
         return -1
@@ -834,13 +802,6 @@ def flashFile(packagePath, rebootInApMode):
                 print >> sys.stderr, inst
                 return -1
 
-            if rebootInApMode:
-                if (not os.path.isfile("/update" + HOST_AP_MODE_FILE)):
-                    host_ap_mode_file = open("/update" + HOST_AP_MODE_FILE, "w")
-                    host_ap_mode_file.write("Indicates that Edison will start in host AP mode next boot\n")
-                    host_ap_mode_file.close()
-                    print "Will start in host AP mode next boot."
-
             try:
                 ret_value = subprocess.call("umount /update", shell=True)
                 if ret_value != 0:
@@ -878,93 +839,11 @@ def flashFile(packagePath, rebootInApMode):
         removeFolderContents("/update")
         print "Please reboot the device to return to normal."
 
-def isRestartWithAPSet():
-    try:
-        ret_value = subprocess.call("mkdir -p /update", shell=True)
-        if ret_value != 0:
-            print "Could not create destination folder."
-            return False
-    except Exception as inst:
-        print "Could not create destination folder."
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        return False
-
-    try:
-        ret_value = subprocess.call("losetup -o 8192 /dev/loop0 /dev/disk/by-partlabel/update", shell=True)
-        if ret_value != 0:
-            print "Could not setup loop device"
-            return False
-    except Exception as inst:
-        print "Could not setup loop device"
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        return False
-
-    try:
-        ret_value = subprocess.call("mount /dev/loop0 /update", shell=True)
-        if ret_value != 0:
-            print "Could not perform mount operation."
-            return False
-    except Exception as inst:
-        print "Could not perform mount operation."
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        return False
-
-    if os.path.isfile("/update" + HOST_AP_MODE_FILE):
-        ap_mode = True
-    else:
-        ap_mode = False
-    try:
-        ret_value = subprocess.call("umount /update", shell=True)
-        if ret_value != 0:
-            print "Could not perform umount operation."
-            return False
-    except Exception as inst:
-        print "Could not perform umount operation."
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        return False
-    try:
-        ret_value = subprocess.call("rmdir /update", shell=True)
-        if ret_value != 0:
-            print "Could not delete destination folder."
-            return False
-    except Exception as inst:
-        print "Could not delete destination folder."
-        print >> sys.stderr, type(inst)
-        print >> sys.stderr, inst
-        return False
-
-    return ap_mode
-
-def upgrade(packagePath, rebootInApMode):
-    curr = None
-    build_type = None
-
-    try:
-        build_type, curr = getCurrentFirmwareInfo()
-    except Exception as inst:
-        print >> sys.stderr, "Could not determine firmware version information."
-        raise
-
-    try:
-        latest, sha1, url = getLatestFirmwareInfo()
-    except Exception as inst:
-        print >> sys.stderr, "Could not retrieve latest firmware version information."
-        raise
-
-    if int(latest) > int(curr):
-        doOTAFlash(url, sha1, packagePath, rebootInApMode)
-    else:
-        print "The latest version is already installed."
-
 def full():
   reset("Device Password")
-  setEdisonPassword()
+  setDevicePassword()
   reset("Device Name")
-  setEdisonHostname()
+  setDeviceHostname()
   if decideToConnect():
     connectNetwork()
   else:
@@ -987,9 +866,9 @@ def getDefaultSSID():
     default_ssid_file.close()
     return curr_ssid.strip()
 
-def checkOneTimeSetup():
+def checkSetupState():
     if not os.path.isfile(STATE_DIR + "/network.done"):
-	enableOneTimeSetup(False)
+	enableSetupMode()
     else:
         # Check network connection and enable AP mode if WiFi is not connected after 1 minute
         t = 60
@@ -1000,11 +879,17 @@ def checkOneTimeSetup():
                 break
             if t == 0:
 		os.remove(STATE_DIR + "/network.done")
-                enableOneTimeSetup(False)
+                enableSetupMode()
 	    else:
 	        t = t-1
 
-def enableOneTimeSetup(persist):
+def toggleSetupMode():
+    if(showWiFiMode() == "Master":
+	disableSetupMode()
+    else:
+	enableSetupMode()
+
+def enableSetupMode():
     subprocess.call("systemctl restart blink-led", shell=True)
 
     hostname = subprocess.check_output('hostname').strip()
@@ -1017,11 +902,6 @@ def enableOneTimeSetup(persist):
     print "Restarting WiFi access point. Please wait..."
     print ""
 
-    if persist:
-        subprocess.call("systemctl disable wpa_supplicant &> /dev/null", shell=True)
-        subprocess.call("systemctl enable hostapd &> /dev/null", shell=True)
-        subprocess.call("systemctl enable blink-led &> /dev/null", shell=True)
-
     if int(subprocess.check_output("systemctl status hostapd | grep 'active (running)' | wc -l", shell=True)) == 0:
         subprocess.call("systemctl start hostapd &> /dev/null", shell=True)
 
@@ -1030,7 +910,7 @@ def enableOneTimeSetup(persist):
     print "From your PC or laptop, connect to the", "'" + myssid + "' network "
     print "and visit",  "'" + hostname + ".local' in the browser"
 
-def disableOneTimeSetup(persist):
+def disableSetupMode():
     subprocess.call("systemctl stop blink-led &> /dev/null", shell=True)
     subprocess.call("systemctl stop hostapd &> /dev/null", shell=True)
 
@@ -1039,19 +919,8 @@ def disableOneTimeSetup(persist):
     except Exception as inst:
         pass
 
-    if persist:
-        subprocess.call("systemctl enable wpa_supplicant &> /dev/null", shell=True)
-        subprocess.call("systemctl disable hostapd &> /dev/null", shell=True)
-        subprocess.call("systemctl disable blink-led &> /dev/null", shell=True)
-
     if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
         subprocess.call("systemctl start wpa_supplicant &> /dev/null", shell=True)
-
-def toggleOneTimeSetup(persist):
-    if showWiFiMode() == "Master":
-        disableOneTimeSetup(persist)
-    else:
-        enableOneTimeSetup(persist)
 
 def showNames():
     hostname = subprocess.check_output('hostname', shell=True).strip()
@@ -1063,10 +932,7 @@ def main():
 
     global CURR_PACKAGE_PATH
 
-    parser = argparse.ArgumentParser(prog='configure_edison')
-
-    parser.add_argument('--restartWithAP', dest='restartwithap', help=argparse.SUPPRESS, action='store_true', default=False)
-    parser.add_argument('--persist', dest='persist', help=argparse.SUPPRESS, action='store_true', default=False)
+    parser = argparse.ArgumentParser(prog='configure_device')
 
     root_group = parser.add_mutually_exclusive_group()
 
@@ -1077,24 +943,14 @@ def main():
     group_interactive.add_argument('--wifi', dest='wifi', help='Changes the wifi options', action='store_true', default=False)
 
     group_non_interactive = root_group.add_mutually_exclusive_group()
-    group_non_interactive.add_argument('--isRestartWithAPSet', dest='isrestartwithapset', help=argparse.SUPPRESS, action='store_true', default=False)
     group_non_interactive.add_argument('--showWiFiIP', dest='showwifiip', help='IP address associated with the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--showWiFiMode', dest='showwifimode', help='Show current mode for the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--version', dest='version', help='Gets the current firmware version', action='store_true', default=False)
-    group_non_interactive.add_argument('--latest-version', dest='latestversion', help='Gets the latest firmware version', action='store_true', default=False)
-    group_non_interactive.add_argument('--disableOneTimeSetup', dest='disableonetimesetup', help='Disable one-time setup with WiFi access point and enable WiFi client mode \
-                                       Append --persist to retain this setting after reboot', action='store_true', default=False)
-    group_non_interactive.add_argument('--checkOneTimeSetup', dest='checkOneTimeSetup', help='Enable one-time setup and WiFi access point if not completed', action='store_true', default=False)
-    group_non_interactive.add_argument('--enableOneTimeSetup', dest='enableonetimesetup', help='Enable one-time setup with WiFi access point and disable WiFi client mode. \
-                                        Append --persist to retain this setting after reboot', action='store_true', default=False)
-    group_non_interactive.add_argument('--toggleOneTimeSetup', dest='toggleonetimesetup', help='Switch between one-time setup with WiFi access point and WiFi client mode, and visa-versa. \
-                                       Append --persist to retain this setting after reboot', action='store_true', default=False)
-    group_non_interactive.add_argument('--upgrade', dest='upgrade', help='Downloads the latest firmware. Append --restartWithAP to reboot in WiFi access point mode after flashing', \
-                                       action='store_true', default=False)
-    group_non_interactive.add_argument('--flash', metavar=('<version>','<release name>'), nargs='+', dest='otaflash', help='Downloads and flashes an image \
-                                       Append --restartWithAP to reboot in WiFi access point mode after flashing')
-    group_non_interactive.add_argument('--flashFile', metavar=('<image-file>'), nargs=1, dest='flashfile', help='Flashes the given image (.zip). \
-                                       Append --restartWithAP to reboot WiFi access point mode after flashing')
+    group_non_interactive.add_argument('--enableSetupMode', dest='enablesetupmode', help='Enable setup mode and WiFi access point.', action='store_true', default=False)
+    group_non_interactive.add_argument('--disableSetupMode', dest='disablesetupmode', help='Disable setup mode and enable WiFi client mode', action='store_true', default=False)
+    group_non_interactive.add_argument('--checkSetupState', dest='checksetupstate', help='Enables setup mode and WiFi access point if not completed', action='store_true', default=False)
+    group_non_interactive.add_argument('--toggleSetupMode', dest='togglesetupmode', help='Toggles setup mode and WiFi access point depending on current state.', action='store_true', default=False)
+    group_non_interactive.add_argument('--flashFile', metavar=('<image-file>'), nargs=1, dest='flashfile', help='Flashes the given image (.zip).')
     group_non_interactive.add_argument('--changePassword', metavar='password', dest='changepassword', const='', help=argparse.SUPPRESS, nargs='?')
     group_non_interactive.add_argument('--changeName', metavar='name', dest='changename', help=argparse.SUPPRESS, nargs=1)
     group_non_interactive.add_argument('--changeWiFi', metavar='securityType SSID [Identity | password]', dest='changewifi', help=argparse.SUPPRESS, nargs='+')
@@ -1108,16 +964,16 @@ def main():
 
     if args.name:
         reset("Device Name")
-        setEdisonHostname()
+        setDeviceHostname()
 
     if args.password:
         reset("Device Password")
-        setEdisonPassword()
+        setDevicePassword()
 
     if args.wifi:
         connectNetwork()
         if not os.path.isfile(STATE_DIR + "/password-setup.done"):
-            print "Warning: SSH is not yet enabled on the wireless interface. To enable SSH access to this device via wireless run configure_edison --password first."
+            print "Warning: SSH is not yet enabled on the wireless interface. To enable SSH access to this device via wireless run configure_device --password first."
 
     if args.setup:
         full()
@@ -1130,62 +986,8 @@ def main():
             print >> sys.stderr, "Could not determine firmware version information. Quitting."
             print "none"
 
-    if args.latestversion:
-        try:
-            latestversion, sha1, url = getLatestFirmwareInfo()
-            print latestversion
-        except Exception as inst:
-            print >> sys.stderr, "Could not retrieve latest firmware version information. Quitting."
-            print "none"
-
-    if args.upgrade:
-        try:
-            CURR_PACKAGE_PATH = DESTINATION_PATH + "package.zip"
-            upgrade(CURR_PACKAGE_PATH, args.restartwithap)
-
-        except Exception as inst:
-            print "Could not upgrade device firmware. Quitting."
-            print >> sys.stderr, type(inst)
-            print >> sys.stderr, inst
-            return -1
-
     if args.shownames:
         showNames()
-
-    if args.isrestartwithapset:
-        print isRestartWithAPSet()
-
-    if args.otaflash != None:
-        version = None
-        sha1 = None
-        url = None
-
-        try:
-            if len(args.otaflash) == 1:
-                try:
-                    build_type, build_number = getCurrentFirmwareInfo()
-                    version, sha1, url = getSpecificFirmwareInfo(build_type, args.otaflash[0])
-                except Exception as inst:
-                    print >> sys.stderr, "Could not determine firmware verison information."
-                    raise
-            elif len(args.otaflash) == 2:
-                version, sha1, url = getSpecificFirmwareInfo(args.otaflash[1], args.otaflash[0])
-            else:
-                print "error: usage: configure_edison --flash <version> [ <release name> ]"
-        except Exception as inst:
-            print "Could not retrieve required firmware information. Quitting."
-            return -1
-
-        CURR_PACKAGE_PATH = DESTINATION_PATH + "package.zip"
-
-        try:
-            doOTAFlash(url, sha1, CURR_PACKAGE_PATH, args.restartwithap)
-
-        except Exception as inst:
-            print >> sys.stderr, type(inst)
-            print >> sys.stderr, inst
-            print "Could not flash device. Quitting."
-            return -1
 
     if args.flashfile != None:
         CURR_PACKAGE_PATH = args.flashfile[0]
@@ -1203,39 +1005,32 @@ def main():
     if args.showwifimode:
         print showWiFiMode()
 
-    if args.enableonetimesetup:
-        enableOneTimeSetup(args.persist)
+    if args.enablesetupmode:
+        enableSetupMode()
 
-    if args.disableonetimesetup:
-        disableOneTimeSetup(args.persist)
+    if args.disablesetupmode:
+        disableSetupMode()
 
-    if args.checkOneTimeSetup:
-        checkOneTimeSetup()
+    if args.checksetupstate:
+        checkSetupState()
 
-    if args.toggleonetimesetup:
-        toggleOneTimeSetup(args.persist)
+    if args.togglesetupmode:
+        toggleSetupMode()
 
     if args.changewifi != None:
         network_conf = configureNetworkAP(args.changewifi)
         if network_conf != None:
             setNetwork(network_conf, args.changewifi[1])
 
-    #print 'restartwithap = ',args.restartwithap
-    #print 'persist = ',args.persist
     #print 'setup = ',args.setup
     #print 'name = ',args.name
     #print 'password = ',args.password
     #print 'wifi = ',args.wifi
-
     #print 'showwifiip = ',args.showwifiip
     #print 'version = ',args.version
-    #print 'latestversion = ',args.latestversion
-    #print 'upgrade = ',args.upgrade
-    #print 'disableonetimesetup = ',args.disableonetimesetup
-    #print 'enableonetimesetup = ',args.enableonetimesetup
-    #print 'otaflash = ',args.otaflash
+    #print 'disablesetupmode = ',args.disablesetupmode
+    #print 'enablesetupmode = ',args.enablesetupmode
     #print 'changepassword = ',args.changepassword
-
     #print 'changename = ',args.changename
 
 if __name__ == "__main__":

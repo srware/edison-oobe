@@ -27,12 +27,10 @@ var supportedExtensions = {
   "jpg"   : "image/jpeg",
   "png"   : "image/png"
 };
-var STATE_DIR = '/var/lib/edison_config_tools';
+var STATE_DIR = '/var/lib/config_tools';
 var NETWORKS_FILE = STATE_DIR + '/networks.txt';
 var COMMAND_OUTPUT = "";
 var COMMAND_OUTPUT_MAX = 3072; // bytes
-// available when edison is not in AP-mode. In AP-mode, however, all commands and files are available.
-// That's because AP-mode is considered somewhat more secure (credentials are derived from mac address and serial number on box)
 var WHITELIST_CMDS = {
   "/commandOutput": true
 };
@@ -43,7 +41,7 @@ var WHITELIST_PATHS = {
   "/logo-intel.png": true
 };
 var WHITELIST_EXEC = {
-  "configure_edison": true,
+  "configure_device": true,
   "sleep": true
 };
 
@@ -119,7 +117,7 @@ function setHost(params) {
   if (params.name.length < 5) {
     return {failure: "The name is too short (must be at least 5 characters). Please try again."};
   }
-  return {cmd: "configure_edison", args: ["--changeName", params.name]};
+  return {cmd: "configure_device", args: ["--changeName", params.name]};
 }
 
 function setPass(params) {
@@ -135,7 +133,7 @@ function setPass(params) {
     if (params.pass1.length < 8 || params.pass1.length > 63) {
       return {failure: "Passwords must be between 8 and 63 characters long. Please try again."};
     }
-    return {cmd: "configure_edison", args: ["--changePassword", params.pass1]};
+    return {cmd: "configure_device", args: ["--changePassword", params.pass1]};
   }
   return {failure: "Passwords do not match. Please try again."};
 }
@@ -148,13 +146,13 @@ function setWiFi(params) {
   } else if (!params.protocol) {
     errmsg = "Please specify the network protocol (Open, WEP, etc.)";
   } else if (params.protocol === "OPEN") {
-    exec_cmd = "configure_edison";
+    exec_cmd = "configure_device";
     exec_args.push("--changeWiFi");
     exec_args.push("OPEN");
     exec_args.push(params.newwifi);
   } else if (params.protocol === "WEP") {
     if (params.netpass.length == 5 || params.netpass.length == 13) {
-      exec_cmd = "configure_edison";
+      exec_cmd = "configure_device";
       exec_args.push("--changeWiFi");
       exec_args.push("WEP");
       exec_args.push(params.newwifi);
@@ -164,7 +162,7 @@ function setWiFi(params) {
     }
   } else if (params.protocol === "WPA-PSK") {
       if (params.netpass && params.netpass.length >= 8 && params.netpass.length <= 63) {
-        exec_cmd = "configure_edison";
+        exec_cmd = "configure_device";
         exec_args.push("--changeWiFi");
         exec_args.push("WPA-PSK");
         exec_args.push(params.newwifi);
@@ -174,7 +172,7 @@ function setWiFi(params) {
       }
   } else if (params.protocol === "WPA-EAP") {
       if (params.netuser && params.netpass) {
-        exec_cmd = "configure_edison";
+        exec_cmd = "configure_device";
         exec_args.push("--changeWiFi");
         exec_args.push("WPA-EAP");
         exec_args.push(params.newwifi);
@@ -247,12 +245,12 @@ function submitForm(params, res, req) {
   }
 
   // no errors occurred. Do success response.
-  exec ('configure_edison --showNames', function (error, stdout, stderr) {
+  exec ('configure_device --showNames', function (error, stdout, stderr) {
     var nameobj = {hostname: "unknown", ssid: "unknown", default_ssid: "unknown"};
     try {
       nameobj = JSON.parse(stdout);
     } catch (ex) {
-      console.log("Could not parse output of configure_edison --showNames (may not be valid JSON)");
+      console.log("Could not parse output of configure_device --showNames (may not be valid JSON)");
       console.log(ex);
     }
 
@@ -276,7 +274,7 @@ function submitForm(params, res, req) {
     res_str = res_str.replace(/params_curr_hostname/g, nameobj.hostname + ".local");
     res.end(res_str);
 
-    commands.push({cmd: "configure_edison", args: ["--disableOneTimeSetup", "--persist"]});
+    commands.push({cmd: "configure_device", args: ["--disableSetupMode"]});
 
     // Now execute the commands serially
     runCmd(0, commands);
@@ -306,7 +304,7 @@ function handlePostRequest(req, res) {
       } else {
         var exitupgradeStr = fs.readFileSync(site + '/exit-upgrade.html', {encoding: 'utf8'});
         var currversion;
-        exec('configure_edison --version ',
+        exec('configure_device --version ',
           function (error, stdout, stderr) {
             if (error) {
               currversion = "unknown";
@@ -316,33 +314,33 @@ function handlePostRequest(req, res) {
 
             exitupgradeStr = exitupgradeStr.replace(/params_version/g, currversion);
 
-            exec ('configure_edison --showNames', function (error, stdout, stderr) {
+            exec ('configure_device --showNames', function (error, stdout, stderr) {
               var nameobj = {};
               try {
                 nameobj = JSON.parse(stdout);
               } catch (ex) {
-                console.log("Could not parse output of configure_edison --showNames (may not be valid JSON)");
+                console.log("Could not parse output of configure_device --showNames (may not be valid JSON)");
                 console.log(ex);
               }
 
               exitupgradeStr = exitupgradeStr.replace(/params_new_wifi/g, "");
-              exitupgradeStr = exitupgradeStr.replace(/params_hostname/g, "edison.local");
+              exitupgradeStr = exitupgradeStr.replace(/params_hostname/g, "device.local");
               exitupgradeStr = exitupgradeStr.replace(/params_ssid/g, nameobj.default_ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_curr_ssid/g, nameobj.ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_curr_hostname/g, nameobj.hostname + ".local");
               res.end(exitupgradeStr);
-              runCmd(0, [{cmd: 'configure_edison', args: ['--flashFile', files.imagefile[0].path]}]);
+              runCmd(0, [{cmd: 'configure_device', args: ['--flashFile', files.imagefile[0].path]}]);
             });
           });
       }
     });
   } else if (urlobj.pathname === '/enableSetup') {
-    exec ('configure_edison --showNames', function (error, stdout, stderr) {
+    exec ('configure_device --showNames', function (error, stdout, stderr) {
         var nameobj = {hostname: "unknown", ssid: "unknown", default_ssid: "unknown"};
         try {
             nameobj = JSON.parse(stdout);
         } catch (ex) {
-            console.log("Could not parse output of configure_edison --showNames (may not be valid JSON)");
+            console.log("Could not parse output of configure_device --showNames (may not be valid JSON)");
             console.log(ex);
         }
 
@@ -353,7 +351,7 @@ function handlePostRequest(req, res) {
         res_str = res_str.replace(/params_ssid/g, ssid);
         res.end(res_str);
 
-        runCmd(0, [{cmd: 'configure_edison', args: ['--enableOneTimeSetup']}]);
+        runCmd(0, [{cmd: 'configure_device', args: ['--enableSetupMode']}]);
     });
   } else {
     pageNotFound(res);
@@ -364,7 +362,7 @@ function inWhiteList(path) {
   if (!path)
     return false;
   // if shell command succeeds and in host AP mode
-  var result = shell.exec('configure_edison --showWiFiMode', {silent:true});
+  var result = shell.exec('configure_device --showWiFiMode', {silent:true});
   if ((result.code != 0) || (result.output.trim() === "Master")) {
     return true;
   }
@@ -392,11 +390,11 @@ function requestHandler(req, res) {
   if (!urlobj.pathname || urlobj.pathname === '/' || urlobj.pathname === '/index.html') {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    var result = shell.exec('configure_edison --showWiFiMode', {silent:true});
+    var result = shell.exec('configure_device --showWiFiMode', {silent:true});
     if ((result.code != 0) || (result.output.trim() != "Master")) {
       var res_str = fs.readFileSync(site + '/status.html', {encoding: 'utf8'});
       var myhostname, myipaddr;
-      exec('configure_edison --showWiFiIP', function (error, stdout, stderr) {
+      exec('configure_device --showWiFiIP', function (error, stdout, stderr) {
         if (error) {
           console.log("Error occurred:");
           console.log(stderr);
@@ -441,7 +439,7 @@ function requestHandler(req, res) {
   }
 }
 
-exec('configure_edison --showNames', function (error, stdout, stderr) {
+exec('configure_device --showNames', function (error, stdout, stderr) {
   if (error) {
     console.log("Error saving default SSID");
     console.log(error);
@@ -454,15 +452,6 @@ exec('configure_edison --showNames', function (error, stdout, stderr) {
           console.log("Upgrade status file saved");
         }
       });
-      var result = shell.exec('configure_edison --isRestartWithAPSet', {silent:true});
-      if ((result.code != 0) || (result.output.trim() === "True")) {
-        exec('configure_edison --enableOneTimeSetup', function (error, stdout, stderr) {
-          if (error) {
-            console.log("Error starting out-of-box-experience.");
-            console.log(error);
-          }
-        });
-      }
   }
 });
 

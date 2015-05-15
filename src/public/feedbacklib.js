@@ -85,8 +85,8 @@ function initFeedbackLib(config) {
       "reconnecting this machine to the '" + NEW_WIFI + "' network and clicking " +
       "<a href='http://" + NEW_HOSTNAME + "'>http://" + NEW_HOSTNAME + "</a>. You can also rerun this setup " +
       "by following the steps below. " +
-      "If that fails, please connect to the device via its serial port and run <code>configure_edison " +
-      "--wifi</code> on the command line. To learn about other configuration options, run <code>configure_edison " +
+      "If that fails, please connect to the device via its serial port and run <code>configure_device " +
+      "--wifi</code> on the command line. To learn about other configuration options, run <code>configure_device " +
       "--help</code>." + "<br><br>" + getRerunSetupMessage(NEW_HOSTNAME, NEW_SSID);
 
   if (config && config.errsetup)
@@ -96,8 +96,8 @@ function initFeedbackLib(config) {
       "<b style='color: red'>Sorry, we encountered an error while configuring your device.</b> " +
       "Please see messsages in the status area above for details. At this time, we recommend rerunning this setup " +
       "by following the steps below. If that fails, please connect to the device via its serial port " +
-      "and run <code>configure_edison --setup</code> on the command line. " +
-      "To learn about other configuration options, run <code>configure_edison --help</code>." + "<br><br>" +
+      "and run <code>configure_device --setup</code> on the command line. " +
+      "To learn about other configuration options, run <code>configure_device --help</code>." + "<br><br>" +
       getRerunSetupMessage(CURRENT_HOSTNAME, CURRENT_SSID);
 
   updateProgressText();
@@ -199,7 +199,7 @@ function queryForDevice() {
   xmlhttp.ontimeout = handleServerNonResponse;
   xmlhttp.onerror = handleServerNonResponse;
 
-  xmlhttp.open("GET", PROTO + NEW_HOSTNAME + "/" + OUTPUT_CMD, true); // change to edison address
+  xmlhttp.open("GET", PROTO + NEW_HOSTNAME + "/" + OUTPUT_CMD, true); // change to device address
   xmlhttp.send();
 }
 

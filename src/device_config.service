@@ -1,0 +1,13 @@
+[Unit]
+Description=Monitors the device setup state and enabled the configuration web interface.
+After=mdns.service post-install.service
+
+[Service]
+ExecStartPre=/usr/bin/configure_device --checkSetupState
+ExecStart=/bin/su root -c 'node /usr/lib/config_tools/config-server.js'
+Restart=always
+RestartSec=10s
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

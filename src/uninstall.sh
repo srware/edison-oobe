@@ -1,14 +1,14 @@
 #!/bin/sh
 
-rm -rf /usr/lib/edison_config_tools
+rm -rf /usr/lib/config_tools
 
-systemctl stop edison_config
-systemctl disable edison_config
-rm /lib/systemd/system/edison_config.service
+systemctl stop device_config
+systemctl disable device_config
+rm /lib/systemd/system/device_config.service
 
 systemctl daemon-reload
 
-rm /usr/bin/configure_edison
+rm /usr/bin/configure_device
 
 echo ""
 echo ""
