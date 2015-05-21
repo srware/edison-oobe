@@ -852,8 +852,6 @@ def toggleSetupMode():
 	enableSetupMode()
 
 def enableSetupMode():
-    subprocess.call("systemctl restart blink-led", shell=True)
-
     hostname = subprocess.check_output('hostname').strip()
 
     print "Scanning and saving WiFi networks..."
@@ -863,6 +861,8 @@ def enableSetupMode():
 
     print "Restarting WiFi access point. Please wait..."
     print ""
+
+    subprocess.call("systemctl restart blink-led", shell=True)
 
     if int(subprocess.check_output("systemctl status hostapd | grep 'active (running)' | wc -l", shell=True)) == 0:
         subprocess.call("systemctl start hostapd &> /dev/null", shell=True)
