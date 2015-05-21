@@ -37,6 +37,7 @@ var WHITELIST_CMDS = {
 var WHITELIST_PATHS = {
   "/index.html": true,
   "/": true,
+  "/enableSetup": true,
   "/main.css": true,
   "/logo-intel.png": true
 };
@@ -333,6 +334,9 @@ function handlePostRequest(req, res) {
       }
     });
   } else if (urlobj.pathname === '/enableSetup') {
+
+    var enableSetupStr = fs.readFileSync(site + '/exit-enable-setup.html', {encoding: 'utf8'});
+
     exec ('configure_device --showNames', function (error, stdout, stderr) {
         var nameobj = {hostname: "unknown", ssid: "unknown", default_ssid: "unknown"};
         try {
@@ -340,14 +344,11 @@ function handlePostRequest(req, res) {
         } catch (ex) {
             console.log("Could not parse output of configure_device --showNames (may not be valid JSON)");
             console.log(ex);
-        }
+        }        
 
-        var hostname = nameobj.hostname, ssid = nameobj.ssid;
-        var res_str = fs.readFileSync(site + '/exit-enable-setup.html', {encoding: 'utf8'});
-
-        res_str = res_str.replace(/params_hostname/g, hostname + ".local");
-        res_str = res_str.replace(/params_ssid/g, ssid);
-        res.end(res_str);
+        enableSetupStr = enableSetupStr.replace(/params_hostname/g, nameobj.hostname + ".local");
+        enableSetupStr = enableSetupStr.replace(/params_ssid/g, nameobj.ssid);
+        res.end(enableSetupStr);
 
         runCmd(0, [{cmd: 'configure_device', args: ['--enableSetupMode']}]);
     });
