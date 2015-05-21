@@ -323,7 +323,7 @@ function handlePostRequest(req, res) {
               }
 
               exitupgradeStr = exitupgradeStr.replace(/params_new_wifi/g, "");
-              exitupgradeStr = exitupgradeStr.replace(/params_hostname/g, "device.local");
+              exitupgradeStr = exitupgradeStr.replace(/params_hostname/g, nameobj.default_ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_ssid/g, nameobj.default_ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_curr_ssid/g, nameobj.ssid);
               exitupgradeStr = exitupgradeStr.replace(/params_curr_hostname/g, nameobj.hostname + ".local");
