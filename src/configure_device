@@ -153,7 +153,7 @@ def getPassword(prompt):
   stdout.write('\n')
   return pw
 
-#failure code. needs to create an error log later.
+# Failure code. Needs to create an error log later.
 def noooo(location):
   unacceptable_failure = "Strange Error... this shouldn't happen. Failure at %s. Let us know so we can patch this."
   print unacceptable_failure % location
@@ -180,6 +180,7 @@ def changeName(newName):
   _changeHostName(newName)
   _changeP2PSSID(newName)
   _changeAPSSID(newName)
+  _changeUPnPName(newName)
 
 def _changeHostName(newName):
   hostname_file = open('/etc/hostname','w')
@@ -194,6 +195,14 @@ def _changeAPSSID(newName):
 
 def _changeP2PSSID(newName):
   subprocess.call(["sed", "-i", "s/^p2p_ssid_postfix=.*/p2p_ssid_postfix=" + newName + "/", "/etc/wpa_supplicant/p2p_supplicant.conf"])
+
+def _changeUPnPName(newName):
+  subprocess.call(["sed", "-i", "s/var name=\".*\";/var name=\"" + newName + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
+  subprocess.call("systemctl restart upnp", shell=True)
+
+def _changeUPnPAddress(newAddress):
+  subprocess.call(["sed", "-i", "s/var address=\".*\";/var address=\"http:\/\/" + newAddress + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
+  subprocess.call("systemctl restart upnp", shell=True)
 
 def changePassword(newPass):
   if WSREGEX.search(newPass):
@@ -513,6 +522,7 @@ def checkNetwork():
     address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
     if not address == "":
       subprocess.call("systemctl enable wpa_supplicant &> /dev/null", shell=True)
+      _changeUPnPAddress(address)
       print "Done. Please connect your laptop or PC to the same network as this device and go to " + \
         text_colors.CYAN + "http://" + address + text_colors.END + " or " + text_colors.CYAN + \
         "http://" + subprocess.check_output('hostname').strip() + ".local" + text_colors.END + \
@@ -627,10 +637,6 @@ def signal_term_handler_package_only(signal, handler):
     removePackage()
     sys.exit(0)
 
-def err_downloadPackage():
-    print "Failed to download the new firmware. Unable to proceed."
-    removePackage()
-
 def err_createDestPackage():
     print "Could not create destination folder. Unable to proceed."
     removePackage()
@@ -665,31 +671,6 @@ def err_umountDevice():
     print "Please reboot the device to return to normal."
     removePackage()
     removeFolderContents("/update")
-
-def genSha1ForFile(file_path):
-    chunkSize = 524288 # 512 KB chunk
-    sha = hashlib.sha1()
-    with open(file_path, 'rb') as f:
-        buf = f.read(chunkSize)
-        while len(buf) > 0:
-            sha.update(buf)
-            buf = f.read(chunkSize)
-    return sha.hexdigest()
-
-def downloadPackage(packageUrl, sha1FromServer, packagePath):
-    ret_value = subprocess.call("curl --connect-timeout 10 "+ "'"+packageUrl+"'" + " >"+packagePath, shell=True)
-    if ret_value != 0:
-        err_downloadPackage()
-        return -1
-
-    shaOfDownloadedPkg = genSha1ForFile(packagePath)
-
-    if sha1FromServer != shaOfDownloadedPkg:
-        print "Could not establish integrity of downloaded firmware (hash mismatch). Unable to proceed"
-        removePackage()
-        return -1
-
-    return 0
 
 def flashFile(packagePath):
     if not os.path.isfile(packagePath):
@@ -838,6 +819,7 @@ def checkSetupState():
             time.sleep(1)
             address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
             if not address == "":
+		_changeUPnPAddress(address)
                 break
             if t == 0:
 		os.remove(STATE_DIR + "/network.done")
@@ -857,6 +839,7 @@ def enableSetupMode():
     print "Scanning and saving WiFi networks..."
     scanForNetworks()
 
+    subprocess.call("systemctl stop upnp", shell=True)
     subprocess.call("systemctl stop wpa_supplicant", shell=True)
 
     print "Restarting WiFi access point. Please wait..."
@@ -883,6 +866,8 @@ def disableSetupMode():
 
     if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
         subprocess.call("systemctl start wpa_supplicant &> /dev/null", shell=True)
+
+    subprocess.call("systemctl restart upnp", shell=True)
 
 def showNames():
     hostname = subprocess.check_output('hostname', shell=True).strip()
