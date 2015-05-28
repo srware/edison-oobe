@@ -200,10 +200,6 @@ def _changeUPnPName(newName):
   subprocess.call(["sed", "-i", "s/var name=\".*\";/var name=\"" + newName + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
   subprocess.call("systemctl restart upnp", shell=True)
 
-def _changeUPnPAddress(newAddress):
-  subprocess.call(["sed", "-i", "s/var address=\".*\";/var address=\"http:\/\/" + newAddress + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
-  subprocess.call("systemctl restart upnp", shell=True)
-
 def changePassword(newPass):
   if WSREGEX.search(newPass):
     print "New password contains whitespaces. Ignoring"
@@ -510,6 +506,7 @@ def setNetwork(network_conf, ssid):
 	network_done = open(STATE_DIR + "/network.done", "w")
       	network_done.write("Indicates that WiFi has been successfully configured.\n")
       	network_done.close()
+        subprocess.call("systemctl restart upnp", shell=True)
 	checkNetwork()
 
 def checkNetwork():
@@ -522,7 +519,6 @@ def checkNetwork():
     address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
     if not address == "":
       subprocess.call("systemctl enable wpa_supplicant &> /dev/null", shell=True)
-      _changeUPnPAddress(address)
       print "Done. Please connect your laptop or PC to the same network as this device and go to " + \
         text_colors.CYAN + "http://" + address + text_colors.END + " or " + text_colors.CYAN + \
         "http://" + subprocess.check_output('hostname').strip() + ".local" + text_colors.END + \
@@ -792,6 +788,9 @@ def full():
   else:
     print "Done.\n"
 
+def getAddress():
+    return os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
+
 def getSSID():
     return subprocess.check_output("grep -o '^ssid=.*' /etc/hostapd/hostapd.conf | awk -F'=' '{print $2}'", shell=True).strip()
 
@@ -817,9 +816,8 @@ def checkSetupState():
         t = 60
         while 1:
             time.sleep(1)
-            address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
+            address = getAddress()
             if not address == "":
-		_changeUPnPAddress(address)
                 break
             if t == 0:
 		os.remove(STATE_DIR + "/network.done")
@@ -834,12 +832,10 @@ def toggleSetupMode():
 	enableSetupMode()
 
 def enableSetupMode():
-    hostname = subprocess.check_output('hostname').strip()
-
     print "Scanning and saving WiFi networks..."
     scanForNetworks()
 
-    subprocess.call("systemctl stop upnp", shell=True)
+    #subprocess.call("systemctl stop upnp", shell=True)
     subprocess.call("systemctl stop wpa_supplicant", shell=True)
 
     print "Restarting WiFi access point. Please wait..."
@@ -852,8 +848,20 @@ def enableSetupMode():
 
     myssid = getSSID()
 
-    print "From your PC or laptop, connect to the", "'" + myssid + "' network "
-    print "and visit",  "'" + hostname + ".local' in the browser"
+    # Check setup mode enabled correctly
+    t = 20
+    while 1:
+        time.sleep(1)
+        address = getAddress()
+        if not address == "":
+	    print "From your PC or laptop, connect to the", "'" + myssid + "' network "
+    	    print "and visit",  "'http://" + address + "' in the browser"
+            break
+        if t == 0:
+	    print "There was an error enable setup mode. WiFi will now return to normal."
+	    disableSetupMode()
+	    break
+	t = t-1
 
 def disableSetupMode():
     subprocess.call("systemctl stop blink-led &> /dev/null", shell=True)
@@ -867,7 +875,7 @@ def disableSetupMode():
     if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
         subprocess.call("systemctl start wpa_supplicant &> /dev/null", shell=True)
 
-    subprocess.call("systemctl restart upnp", shell=True)
+    #subprocess.call("systemctl restart upnp", shell=True)
 
 def showNames():
     hostname = subprocess.check_output('hostname', shell=True).strip()
