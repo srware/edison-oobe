@@ -598,6 +598,12 @@ def getCurrentFirmwareInfo():
     f.close()
     return (ver_str)
 
+def getDeviceInfo():
+    f = open('/etc/device-info','r')
+    info_str = f.read()
+    f.close()
+    return (info_str)
+
 def removeFolderContents(folder_path):
     try:
         # remove the entire contents of the folder including files, hidden files, sub-folders, hidden sub-folders and their contents
@@ -901,6 +907,7 @@ def main():
     group_non_interactive.add_argument('--showWiFiIP', dest='showwifiip', help='IP address associated with the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--showWiFiMode', dest='showwifimode', help='Show current mode for the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--version', dest='version', help='Gets the current firmware version', action='store_true', default=False)
+    group_non_interactive.add_argument('--deviceInfo', dest='deviceinfo', help='Gets information about this device', action='store_true', default=False)
     group_non_interactive.add_argument('--enableSetupMode', dest='enablesetupmode', help='Enable setup mode and WiFi access point.', action='store_true', default=False)
     group_non_interactive.add_argument('--disableSetupMode', dest='disablesetupmode', help='Disable setup mode and enable WiFi client mode', action='store_true', default=False)
     group_non_interactive.add_argument('--checkSetupState', dest='checksetupstate', help='Enables setup mode and WiFi access point if not completed', action='store_true', default=False)
@@ -936,9 +943,19 @@ def main():
     if args.version:
         try:
             version = getCurrentFirmwareInfo()
+	    print "\nPlatform Version\n================"
             print version
         except Exception as inst:
             print >> sys.stderr, "Could not determine firmware version information. Quitting."
+            print "none"
+
+    if args.deviceinfo:
+        try:
+            deviceinfo = getDeviceInfo()
+	    print "\nDevice Information\n=================="
+            print deviceinfo
+        except Exception as inst:
+            print >> sys.stderr, "Could not retrieve device information. Quitting."
             print "none"
 
     if args.shownames:
@@ -983,6 +1000,7 @@ def main():
     #print 'wifi = ',args.wifi
     #print 'showwifiip = ',args.showwifiip
     #print 'version = ',args.version
+    #print 'deviceInfo = ',args.deviceinfo
     #print 'disablesetupmode = ',args.disablesetupmode
     #print 'enablesetupmode = ',args.enablesetupmode
     #print 'changepassword = ',args.changepassword
