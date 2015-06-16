@@ -650,13 +650,13 @@ def err_unloadKernelModules():
     removePackage()
     removeFolderContents("/update")
 
-def err_setupLoopDevice():
-    print "Could not setup loop device. Unable to proceed"
+def err_setupUpdatePartition():
+    print "Could not format update partition. Unable to proceed."
     print "Please reboot the device to return to normal."
     removePackage()
     removeFolderContents("/update")
 
-def err_mountDevice():
+def err_mountPartition():
     print "Could not perform mount operation. Unable to proceed"
     print "Please reboot the device to return to normal."
     removePackage()
@@ -668,7 +668,7 @@ def err_extractPackage():
     removePackage()
     removeFolderContents("/update")
 
-def err_umountDevice():
+def err_umountPartition():
     print "Could not perform umount operation. Unable to proceed"
     print "Please reboot the device to return to normal."
     removePackage()
@@ -707,34 +707,26 @@ def flashFile(packagePath):
                 return -1
 
             try:
-                ret_value = subprocess.call("losetup -o 8192 /dev/loop0 /dev/disk/by-partlabel/update", shell=True)
+                ret_value = subprocess.call("mkdosfs -F 32 -n \"Update\" /dev/disk/by-partlabel/update", shell=True)
                 if ret_value != 0:
-                    err_setupLoopDevice()
+                    err_setupUpdatePartition()
                     return -1
             except Exception as inst:
-                err_setupLoopDevice()
+                err_setupUpdatePartition()
                 print >> sys.stderr, type(inst)
                 print >> sys.stderr, inst
                 return -1
 
             try:
-                ret_value = subprocess.call("mount /dev/loop0 /update", shell=True)
+                ret_value = subprocess.call("mount /dev/disk/by-partlabel/update /update", shell=True)
                 if ret_value != 0:
-                    err_mountDevice()
+                    err_mountPartition()
                     return -1
             except Exception as inst:
-                err_mountDevice()
+                err_mountPartition()
                 print >> sys.stderr, type(inst)
                 print >> sys.stderr, inst
                 return -1
-
-            if os.listdir("/update") != []:
-                print "Removing previous installation files"
-                ret_value = removeFolderContents("/update")
-                if ret_value != 0:
-                    print "Please reboot the device to return to normal."
-                    removePackage()
-                    return -1
 
             try:
                 ret_value = subprocess.call("unzip -o " + packagePath + " -d /update", shell=True)
@@ -750,10 +742,10 @@ def flashFile(packagePath):
             try:
                 ret_value = subprocess.call("umount /update", shell=True)
                 if ret_value != 0:
-                    err_umountDevice()
+                    err_umountPartition()
                     return -1
             except Exception as inst:
-                err_umountDevice()
+                err_umountPartition()
                 print >> sys.stderr, type(inst)
                 print >> sys.stderr, inst
                 return -1
