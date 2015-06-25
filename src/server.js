@@ -350,7 +350,7 @@ function handlePostRequest(req, res) {
         enableSetupStr = enableSetupStr.replace(/params_ssid/g, nameobj.ssid);
         res.end(enableSetupStr);
 
-        runCmd(0, [{cmd: 'configure_device', args: ['--enableSetupMode']}]);
+        runCmd(0, [{cmd: 'configure_device', args: ['--enableWiFiTethering']}]);
     });
   } else {
     pageNotFound(res);
