@@ -16,7 +16,6 @@ import os
 import sys
 from sys import stdout
 import time
-import dbus
 import termios
 import fcntl
 import subprocess
@@ -33,6 +32,78 @@ WSREGEX = re.compile(r"\s+")
 DESTINATION_PATH = "/tmp/"
 STATE_DIR = '/var/lib/config_tools'
 CURR_PACKAGE_PATH = ""
+
+class text_colors:
+  CYAN = '\033[96m'
+  MAGENTA = '\033[95m'
+  BLUE  = '\033[94m'
+  YELLOW = '\033[93m'
+  GREEN = '\033[92m'
+  RED = '\033[91m'
+  END = '\033[0m'
+
+class wpa_templates:
+  START = '''
+ctrl_interface=/var/run/wpa_supplicant
+ctrl_interface_group=0
+update_config=1
+ap_scan=1
+'''
+  OPEN =  '''
+network={
+  ssid="%s"
+  %s
+  key_mgmt=NONE
+}'''
+  WEP =  '''
+network={
+  ssid="%s"
+  %s
+  key_mgmt=NONE
+  group=WEP104 WEP40
+  wep_key0="%s"
+}
+'''
+  WPAPSK =  '''
+network={
+  ssid="%s"
+  %s
+  key_mgmt=WPA-PSK
+  pairwise=CCMP TKIP
+  group=CCMP TKIP WEP104 WEP40
+  eap=TTLS PEAP TLS
+  psk="%s"
+}
+'''
+  WPAEAP =  '''
+network={
+  ssid="%s"
+  %s
+  key_mgmt=WPA-EAP
+  pairwise=CCMP TKIP
+  group=CCMP TKIP WEP104 WEP40
+  eap=TTLS PEAP TLS
+  identity="%s"
+  password="%s"
+  phase1="peaplabel=0"
+}
+'''
+  #worst case, break this out.
+  MAX = '''
+network={
+  ssid="%s"
+  %s
+  key_mgmt=WPA-EAP WPA-PSK IEEE8021X NONE
+  pairwise=CCMP TKIP
+  group=CCMP TKIP WEP104 WEP40
+  psk="%s"
+  eap=TTLS PEAP TLS
+  identity="%s"
+  password="%s"
+  phase1="peaplabel=0"
+}
+'''
+
 
 # Helpers
 #######################################
@@ -82,6 +153,12 @@ def getPassword(prompt):
   stdout.write('\n')
   return pw
 
+# Failure code. Needs to create an error log later.
+def noooo(location):
+  unacceptable_failure = "Strange Error... this shouldn't happen. Failure at %s. Let us know so we can patch this."
+  print unacceptable_failure % location
+  quit()
+
 def verified(selection):
   verify = raw_input("Is " + text_colors.MAGENTA + selection + text_colors.END + " correct? " + text_colors.YELLOW + "[Y or N]" + text_colors.END + ": ")
   if verify == "Y" or verify == "y":
@@ -112,19 +189,16 @@ def _changeHostName(newName):
   subprocess.call("hostname -F /etc/hostname", shell=True)
 
 def _changeAPSSID(newName):
-    if os.path.isfile("/var/lib/connman/settings"):
-  	saveDefaultSSID()
-  	subprocess.call(["sed", "-i", "s/^Tethering.Identifier=.*/Tethering.Identifier=" + newName + "/", "/var/lib/connman/settings"])
-  	subprocess.call("systemctl restart mdns && sleep 2", shell=True)
+  saveDefaultSSID()
+  subprocess.call(["sed", "-i", "s/^ssid=.*/ssid=" + newName + "/", "/etc/hostapd/hostapd.conf"])
+  subprocess.call("systemctl restart mdns && sleep 2", shell=True)
 
 def _changeP2PSSID(newName):
-    if os.path.isfile("/etc/wpa_supplicant/p2p_supplicant.conf"):
-	subprocess.call(["sed", "-i", "s/^p2p_ssid_postfix=.*/p2p_ssid_postfix=" + newName + "/", "/etc/wpa_supplicant/p2p_supplicant.conf"])
+  subprocess.call(["sed", "-i", "s/^p2p_ssid_postfix=.*/p2p_ssid_postfix=" + newName + "/", "/etc/wpa_supplicant/p2p_supplicant.conf"])
 
 def _changeUPnPName(newName):
-    if os.path.isfile("/usr/lib/upnp-service/upnp-service.js"):
-  	subprocess.call(["sed", "-i", "s/var name=\".*\";/var name=\"" + newName + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
-  	subprocess.call("systemctl restart upnp", shell=True)
+  subprocess.call(["sed", "-i", "s/var name=\".*\";/var name=\"" + newName + "\";/", "/usr/lib/upnp-service/upnp-service.js"])
+  subprocess.call("systemctl restart upnp", shell=True)
 
 def changePassword(newPass):
   if WSREGEX.search(newPass):
@@ -149,35 +223,21 @@ def _changeRootPassword(newPass):
   chpasswdSub.communicate()[0]
 
 def _changeAPPassword(newPass):
-    if os.path.isfile("/var/lib/connman/settings"):
-  	subprocess.call(["sed", "-i", "s/^Tethering.Passphrase=.*/Tethering.Passphrase=" + newPass + "/", "/var/lib/connman/settings"])
+  subprocess.call(["sed", "-i", "s/^wpa_passphrase=.*/wpa_passphrase=" + newPass + "/", "/etc/hostapd/hostapd.conf"])
+
+def getNetworkIdentity():
+  return raw_input("Please enter the network username: ")
+
+def getNetworkPassword():
+  pw = ''
+  while len(pw) == 0:
+    pw = getPassword("What is the network password?: ")
+  return pw
 
 def reset(stage):
   subprocess.call("clear", shell=True)
   print text_colors.CYAN + "\nConfigure Device: " + stage + "\n" + text_colors.END
 
-def isWiFiAvailable():
-    bus = dbus.SystemBus()
-    manager = dbus.Interface(bus.get_object('net.connman', "/"),
-					'net.connman.Manager')
-    technologies = manager.GetTechnologies()
-    for path,_ in technologies:
-	if "wifi" in path:
-	    return True
-
-    return False
-
-def isTetheringEnabled():
-    bus = dbus.SystemBus()
-    manager = dbus.Interface(bus.get_object('net.connman', "/"),
-					'net.connman.Manager')
-    technologies = manager.GetTechnologies()
-    for (path, properties) in technologies:
-        if "wifi" in path:
-            if properties["Tethering"] == dbus.Boolean(1):
-		return True
-
-    return False
 
 # Main Functions
 #######################################
@@ -230,6 +290,20 @@ def setDevicePassword():
 
    changePassword(password)
    print "The device password has been changed.\n"
+
+def decideToConnect():
+  while 1:
+    verify = raw_input("Do you want to set up wifi? " + text_colors.YELLOW + "[Y or N]" + text_colors.END + ": ")
+    if verify == "y" or verify == "Y":
+      return 1
+    elif verify == "n" or verify == "N":
+      return 0
+    else:
+      print "I need Y or N as a reply."
+
+WPAPSK_REGEX=re.compile(r'\[WPA[2]?-PSK-.+\]')
+WPAEAP_REGEX=re.compile(r'\[WPA[2]?-EAP-.+\]')
+WEP_REGEX=re.compile(r'\[WEP.*\]')
 
 def scanForNetworks():
   stdout.write("Starting scan\r")
@@ -313,6 +387,66 @@ def selectNetwork(ssid_keys):
       break
   return choice
 
+def configureHiddenNetwork(ssid):
+  print '''
+    0: OPEN
+    1: WEP
+    2: WPA-Personal(PSK)
+    3: WPA-Enterprise (EAP)
+  '''
+  while 1:
+    try:
+      security = int(raw_input("Select the type of security [0 to 3]: "))
+    except TypeError:
+      security = -1
+    except ValueError:
+      security = -1
+
+    if security == 0:
+      return wpa_templates.OPEN % (ssid, "scan_ssid=1")
+    elif security == 1:
+      password = ''
+      while len(password) != 5 and len(password) != 13:
+        print "Password must be either 5 or 13 characters."
+        password = getNetworkPassword()
+      return wpa_templates.WEP % (ssid, "scan_ssid=1", password)
+    elif security == 2:
+      password = ''
+      while len(password) < 8 or len(password) > 63:
+        print "Password must be between 8 and 63 characters."
+        password = getNetworkPassword()
+      return wpa_templates.WPAPSK % (ssid, "scan_ssid=1", password)
+    elif security == 3:
+      identity = getNetworkIdentity()
+      password = getNetworkPassword()
+      return wpa_templates.WPAEAP % (ssid, "scan_ssid=1", identity, password)
+    else:
+      print "Invalid input."
+  return network_template_open % ssid
+
+def configureNetwork(choice,ssid_keys,network_map):
+  ssid = ssid_keys[choice-3]
+  if network_map[ssid] == "OPEN":
+    return wpa_templates.OPEN % (ssid, "")
+  elif network_map[ssid] == "WEP":
+    password = ''
+    while len(password) != 5 and len(password) != 13:
+        print "Password must be either 5 or 13 characters."
+        password = getNetworkPassword()
+    return wpa_templates.WEP % (ssid, "", password)
+  elif network_map[ssid] == "WPA-PSK":
+    password = ''
+    while len(password) < 8 or len(password) > 63:
+        print "Password must be between 8 and 63 characters."
+        password = getNetworkPassword()
+    return wpa_templates.WPAPSK % (ssid, "", password)
+  elif network_map[ssid] == "WPA-EAP":
+    identity = getNetworkIdentity()
+    password = getNetworkPassword()
+    return wpa_templates.WPAEAP % (ssid, "", identity, password)
+  else:
+    print noooo("the last line of startNetworkConfig")
+
 def configureNetworkAP(changewifi):
   protocol = changewifi[0]
   ssid = changewifi[1]
@@ -337,6 +471,8 @@ def configureNetworkAP(changewifi):
     identity = changewifi[2]
     password = changewifi[3]
     return wpa_templates.WPAEAP % (ssid, "scan_ssid=1", identity, password)
+  else:
+    print noooo("the last line of startNetworkConfig")
 
 def setNetwork(network_conf, ssid):
     if not os.path.isfile('/etc/wpa_supplicant/wpa_supplicant.conf.original'):
@@ -350,7 +486,7 @@ def setNetwork(network_conf, ssid):
 
     try:
         if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
-          disableWiFiTethering()
+          disableSetupMode()
           time.sleep(10)
         else:
           subprocess.call("wpa_cli reconfigure &> /dev/null && sleep 2", shell=True)
@@ -364,12 +500,61 @@ def setNetwork(network_conf, ssid):
     except Exception as e:
         print e
         print "Sorry. Could not get an IP address."
+	enableSetupMode()
     else:
         print "Attempting to enable network access..."
 	network_done = open(STATE_DIR + "/network.done", "w")
       	network_done.write("Indicates that WiFi has been successfully configured.\n")
       	network_done.close()
         subprocess.call("systemctl restart upnp", shell=True)
+	checkNetwork()
+
+def checkNetwork():
+  i = 60
+  while 1:
+    waiting = "Connecting: %s seconds left         \r" % i
+    stdout.write(waiting)
+    stdout.flush()
+    time.sleep(1)
+    address = os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
+    if not address == "":
+      subprocess.call("systemctl enable wpa_supplicant &> /dev/null", shell=True)
+      print "Done. Please connect your laptop or PC to the same network as this device and go to " + \
+        text_colors.CYAN + "http://" + address + text_colors.END + " or " + text_colors.CYAN + \
+        "http://" + subprocess.check_output('hostname').strip() + ".local" + text_colors.END + \
+        " in your browser."
+      break
+    if i == 0:
+      print "Not connected. Something went wrong."
+      os.remove(STATE_DIR + "/network.done")
+      enableSetupMode()
+      break
+    i = i-1
+
+def connectNetwork():
+  network_conf = ""
+  ssid = ""
+
+  while 1:
+    reset("WiFi Connection")
+    (ssid_keys, network_map) = scanForNetworks()
+    choice = selectNetwork(ssid_keys)
+
+    #choice is validated within selectNetwork.
+    if choice == 2:
+      while 1:
+          ssid = raw_input("Please enter the hidden network SSID: ")
+          if verified(ssid):
+              break
+      network_conf = configureHiddenNetwork(ssid)
+      break
+    elif choice:
+      network_conf = configureNetwork(choice, ssid_keys,network_map)
+      ssid = ssid_keys[choice-3]
+      break
+
+  #print network_conf
+  setNetwork(network_conf, ssid)
 
 def showWiFiIP():
     ipstr = ''
@@ -596,7 +781,10 @@ def full():
   setDevicePassword()
   reset("Device Name")
   setDeviceHostname()
-  print "Done.\n"
+  if decideToConnect():
+    connectNetwork()
+  else:
+    print "Done.\n"
 
 def getAddress():
     return os.popen("ifconfig | grep -A1 'wlan0' | grep 'inet'| awk -F' ' '{ print $2 }' | awk -F':' '{ print $2 }'").read().rstrip()
@@ -618,68 +806,74 @@ def getDefaultSSID():
     default_ssid_file.close()
     return curr_ssid.strip()
 
-def toggleWiFiTethering():
-    if not isWiFiAvailable():
-	print "WiFi is not available on this device!"
-	return
-
-    if isTetheringEnabled():
-	disableWiFiTethering()
+def checkSetupState():
+    if not os.path.isfile(STATE_DIR + "/network.done"):
+	enableSetupMode()
     else:
-	enableWiFiTethering()
+        # Check network connection and enable AP mode if WiFi is not connected after 1 minute
+        t = 60
+        while 1:
+            time.sleep(1)
+            address = getAddress()
+            if not address == "":
+                break
+            if t == 0:
+		os.remove(STATE_DIR + "/network.done")
+                enableSetupMode()
+		break  
+	    t = t-1
 
-def enableWiFiTethering():
-    if not isWiFiAvailable():
-	print "WiFi is not available on this device!"
-	return
+def toggleSetupMode():
+    if showWiFiMode() == "Master":
+	disableSetupMode()
+    else:
+	enableSetupMode()
 
+def enableSetupMode():
     print "Scanning and saving WiFi networks..."
     scanForNetworks()
 
-    print "Enabling WiFi tethering..."
+    #subprocess.call("systemctl stop upnp", shell=True)
+    subprocess.call("systemctl stop wpa_supplicant", shell=True)
 
-    # Check for override script and use if available to enable tethering (required for Edison)
-    if os.path.isfile("/usr/bin/wifi-tethering"):
-	subprocess.call("/usr/bin/wifi-tethering start", shell=True)
-    else:
-	bus = dbus.SystemBus()
-	manager = dbus.Interface(bus.get_object('net.connman', "/"),
-					'net.connman.Manager')
-	technologies = manager.GetTechnologies()
-	for path,_ in technologies:
-	    if "wifi" in path:
-		technology = dbus.Interface(bus.get_object("net.connman", path),
-					"net.connman.Technology")
-		technology.SetProperty("Tethering", dbus.Boolean(1))
+    print "Restarting WiFi access point. Please wait..."
+    print ""
+
+    subprocess.call("systemctl restart blink-led", shell=True)
+
+    if int(subprocess.check_output("systemctl status hostapd | grep 'active (running)' | wc -l", shell=True)) == 0:
+        subprocess.call("systemctl start hostapd &> /dev/null", shell=True)
 
     myssid = getSSID()
-    print "From your PC or laptop, connect to the", "'" + myssid + "' network"
 
-def disableWiFiTethering():
-    if not isWiFiAvailable():
-	print "WiFi is not available on this device!"
-	return
+    # Check setup mode enabled correctly
+    t = 20
+    while 1:
+        time.sleep(1)
+        address = getAddress()
+        if not address == "":
+	    print "From your PC or laptop, connect to the", "'" + myssid + "' network "
+    	    print "and visit",  "'http://" + address + "' in the browser"
+            break
+        if t == 0:
+	    print "There was an error enable setup mode. WiFi will now return to normal."
+	    disableSetupMode()
+	    break
+	t = t-1
 
-    print "Disabling WiFi tethering..."
-
-    # Check for override script and use if available to enable tethering (required for Edison)
-    if os.path.isfile("/usr/bin/wifi-tethering"):
-	subprocess.call("/usr/bin/wifi-tethering stop", shell=True)
-    else:
-	bus = dbus.SystemBus()
-	manager = dbus.Interface(bus.get_object('net.connman', "/"),
-					'net.connman.Manager')
-	technologies = manager.GetTechnologies()
-	for path,_ in technologies:
-	    if "wifi" in path:
-		technology = dbus.Interface(bus.get_object("net.connman", path),
-					"net.connman.Technology")
-		technology.SetProperty("Tethering", dbus.Boolean(0))
+def disableSetupMode():
+    subprocess.call("systemctl stop blink-led &> /dev/null", shell=True)
+    subprocess.call("systemctl stop hostapd &> /dev/null", shell=True)
 
     try:
         os.remove(STATE_DIR + "/networks.txt")
     except Exception as inst:
         pass
+
+    if int(subprocess.check_output("systemctl status wpa_supplicant | grep 'active (running)' | wc -l", shell=True)) == 0:
+        subprocess.call("systemctl start wpa_supplicant &> /dev/null", shell=True)
+
+    #subprocess.call("systemctl restart upnp", shell=True)
 
 def showNames():
     hostname = subprocess.check_output('hostname', shell=True).strip()
@@ -696,18 +890,20 @@ def main():
     root_group = parser.add_mutually_exclusive_group()
 
     group_interactive = root_group.add_mutually_exclusive_group()
-    group_interactive.add_argument('--setup', dest='setup', help='Goes through changing the device name and password', action='store_true', default=False)
+    group_interactive.add_argument('--setup', dest='setup', help='Goes through changing the device name, password, and wifi options', action='store_true', default=False)
     group_interactive.add_argument('--name', dest='name', help='Changes the device name', action='store_true', default=False)
     group_interactive.add_argument('--password', dest='password', help='Changes the device password', action='store_true', default=False)
+    group_interactive.add_argument('--wifi', dest='wifi', help='Changes the wifi options', action='store_true', default=False)
 
     group_non_interactive = root_group.add_mutually_exclusive_group()
     group_non_interactive.add_argument('--showWiFiIP', dest='showwifiip', help='IP address associated with the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--showWiFiMode', dest='showwifimode', help='Show current mode for the wireless interface', action='store_true', default=False)
     group_non_interactive.add_argument('--version', dest='version', help='Gets the current firmware version', action='store_true', default=False)
     group_non_interactive.add_argument('--deviceInfo', dest='deviceinfo', help='Gets information about this device', action='store_true', default=False)
-    group_non_interactive.add_argument('--enableWiFiTethering', dest='enablewifitethering', help='Enable setup mode and WiFi access point.', action='store_true', default=False)
-    group_non_interactive.add_argument('--disableWiFiTethering', dest='disablewifitethering', help='Disable setup mode and enable WiFi client mode', action='store_true', default=False)
-    group_non_interactive.add_argument('--toggleWiFiTethering', dest='togglewifitethering', help='Toggles setup mode and WiFi access point depending on current state.', action='store_true', default=False)
+    group_non_interactive.add_argument('--enableSetupMode', dest='enablesetupmode', help='Enable setup mode and WiFi access point.', action='store_true', default=False)
+    group_non_interactive.add_argument('--disableSetupMode', dest='disablesetupmode', help='Disable setup mode and enable WiFi client mode', action='store_true', default=False)
+    group_non_interactive.add_argument('--checkSetupState', dest='checksetupstate', help='Enables setup mode and WiFi access point if not completed', action='store_true', default=False)
+    group_non_interactive.add_argument('--toggleSetupMode', dest='togglesetupmode', help='Toggles setup mode and WiFi access point depending on current state.', action='store_true', default=False)
     group_non_interactive.add_argument('--flashFile', metavar=('<image-file>'), nargs=1, dest='flashfile', help='Flashes the given image (.zip).')
     group_non_interactive.add_argument('--changePassword', metavar='password', dest='changepassword', const='', help=argparse.SUPPRESS, nargs='?')
     group_non_interactive.add_argument('--changeName', metavar='name', dest='changename', help=argparse.SUPPRESS, nargs=1)
@@ -727,6 +923,11 @@ def main():
     if args.password:
         reset("Device Password")
         setDevicePassword()
+
+    if args.wifi:
+        connectNetwork()
+        if not os.path.isfile(STATE_DIR + "/password-setup.done"):
+            print "Warning: SSH is not yet enabled on the wireless interface. To enable SSH access to this device via wireless run configure_device --password first."
 
     if args.setup:
         full()
@@ -768,14 +969,17 @@ def main():
     if args.showwifimode:
         print showWiFiMode()
 
-    if args.enablewifitethering:
-        enableWiFiTethering()
+    if args.enablesetupmode:
+        enableSetupMode()
 
-    if args.disablewifitethering:
-        disableWiFiTethering()
+    if args.disablesetupmode:
+        disableSetupMode()
 
-    if args.togglewifitethering:
-        toggleWiFiTethering()
+    if args.checksetupstate:
+        checkSetupState()
+
+    if args.togglesetupmode:
+        toggleSetupMode()
 
     if args.changewifi != None:
         network_conf = configureNetworkAP(args.changewifi)
@@ -785,11 +989,12 @@ def main():
     #print 'setup = ',args.setup
     #print 'name = ',args.name
     #print 'password = ',args.password
+    #print 'wifi = ',args.wifi
     #print 'showwifiip = ',args.showwifiip
     #print 'version = ',args.version
     #print 'deviceInfo = ',args.deviceinfo
-    #print 'disableWiFiTethering = ',args.disableWiFiTethering
-    #print 'enableWiFiTethering = ',args.enableWiFiTethering
+    #print 'disablesetupmode = ',args.disablesetupmode
+    #print 'enablesetupmode = ',args.enablesetupmode
     #print 'changepassword = ',args.changepassword
     #print 'changename = ',args.changename
 
